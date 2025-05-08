@@ -39,3 +39,7 @@ router.post("/make-premium", async (req, res) => {
     res.json({ success: true, user });
   });
   
+  router.get("/test", (req, res) => {
+    res.send("✅ Your backend is live and working!");
+  });
+  
