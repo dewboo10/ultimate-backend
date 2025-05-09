@@ -1,3 +1,4 @@
+const sendOtpEmail = require("../utils/sendOtpEmail");
 const express = require("express");
 const router = express.Router();
 const User = require("../models/User");
@@ -20,7 +21,32 @@ router.post("/login", async (req, res) => {
 
   res.json({ success: true, user });
 });
-
+// SEND OTP
+router.post("/send-otp", async (req, res) => {
+    const { email } = req.body;
+  
+    if (!email) {
+      return res.status(400).json({ success: false, error: "Email is required." });
+    }
+  
+    const otp = Math.floor(100000 + Math.random() * 900000).toString(); // 6-digit OTP
+  
+    const result = await sendOtpEmail(email, otp);
+  
+    if (result.success) {
+      // Store OTP temporarily in memory (or use Redis for production)
+      global.otpStore = global.otpStore || {};
+      global.otpStore[email] = {
+        otp,
+        expiresAt: Date.now() + 10 * 60 * 1000 // 10 minutes
+      };
+  
+      return res.json({ success: true, message: "OTP sent successfully." });
+    } else {
+      return res.status(500).json({ success: false, error: "Failed to send OTP." });
+    }
+  });
+  
 module.exports = router;
 // === MAKE PREMIUM ===
 router.post("/make-premium", async (req, res) => {
@@ -41,5 +67,23 @@ router.post("/make-premium", async (req, res) => {
   
   router.get("/test", (req, res) => {
     res.send("✅ Your backend is live and working!");
+  });
+  // VERIFY OTP
+router.post("/verify-otp", (req, res) => {
+    const { email, otp } = req.body;
+  
+    const stored = global.otpStore?.[email];
+    if (!stored) return res.status(400).json({ success: false, error: "No OTP found." });
+  
+    if (Date.now() > stored.expiresAt) {
+      return res.status(400).json({ success: false, error: "OTP expired." });
+    }
+  
+    if (stored.otp !== otp) {
+      return res.status(400).json({ success: false, error: "Invalid OTP." });
+    }
+  
+    delete global.otpStore[email]; // Clear OTP after use
+    return res.json({ success: true, message: "OTP verified successfully." });
   });
   
