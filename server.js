@@ -5,7 +5,7 @@ require("dotenv").config();
 
 const app = express();
 
-// ✅ CORS setup for both local and deployed frontend
+// ✅ CORS setup for local + Netlify
 app.use(cors({
   origin: [
     "http://localhost:5500",
@@ -15,19 +15,19 @@ app.use(cors({
   credentials: true
 }));
 
-// ✅ Parse JSON and URL-encoded data
+// ✅ Body parsing
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // ✅ Routes
 app.use("/api/auth", require("./routes/auth"));
 
-// ✅ Connect to MongoDB Atlas
+// ✅ MongoDB connection
 mongoose.connect(process.env.MONGODB_URI)
   .then(() => console.log("✅ MongoDB connected"))
   .catch(err => console.error("❌ MongoDB connection error:", err));
 
-// ✅ Start server
+// ✅ Server start
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`🚀 Server running on http://localhost:${PORT}`);
