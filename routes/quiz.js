@@ -1,7 +1,7 @@
 // routes/quiz.js
 const express = require("express");
 const router = express.Router();
-const QuizAttempt = require("../models/QuizAttempt");
+const QuizAttempt = require("../models/quizAttempt");
 
 router.post("/submit", async (req, res) => {
   const { username, exam, day, selectedAnswers } = req.body;
