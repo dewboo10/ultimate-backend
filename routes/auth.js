@@ -44,7 +44,7 @@ router.post("/register", async (req, res) => {
   if (!verifiedEmails.has(username)) {
     return res.status(403).json({ success: false, error: "Please verify OTP before registering." });
   }
-
+  
   const existing = await User.findOne({ username });
   if (existing) return res.status(400).json({ success: false, error: "User already exists." });
 
