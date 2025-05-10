@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const User = require("../models/User");
-const sendOtpEmail = require("../utils/sendOtpEmail");
+const sendOtpEmail = require("/utils/sendOtpEmail");
 
 // In-memory stores
 const otpStore = {};
