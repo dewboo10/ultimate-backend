@@ -1,7 +1,8 @@
 const express = require("express");
 const router = express.Router();
 const User = require("../models/User");
-const sendOtpEmail = require("/utils/sendOtpEmail");
+const sendOtpEmail = require("../utils/sendOtpEmail");
+
 
 // In-memory stores
 const otpStore = {};
@@ -44,7 +45,7 @@ router.post("/register", async (req, res) => {
   if (!verifiedEmails.has(username)) {
     return res.status(403).json({ success: false, error: "Please verify OTP before registering." });
   }
-  
+
   const existing = await User.findOne({ username });
   if (existing) return res.status(400).json({ success: false, error: "User already exists." });
 
