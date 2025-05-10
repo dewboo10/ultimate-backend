@@ -10,6 +10,7 @@ const sendOtpEmail = async (toEmail, otp) => {
         pass: process.env.EMAIL_PASS, // Your app password
       },
     });
+    console.log("Attempting to send OTP to", toEmail, "with OTP", otp);
 
     const mailOptions = {
       from: `"Ultimate Prep" <${process.env.EMAIL_USER}>`,
