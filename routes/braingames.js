@@ -6,8 +6,7 @@ const BrainGameScore = require("../models/brainGameScore");
 // ✅ Submit or update score
 router.post("/submit", async (req, res) => {
   const { username, gameId, score } = req.body;
-
-x  try {
+ try {
     const existing = await BrainGameScore.findOne({ username, gameId });
     if (!existing || existing.score < score) {
       await BrainGameScore.findOneAndUpdate(
