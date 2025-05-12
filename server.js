@@ -22,6 +22,7 @@ app.use(express.urlencoded({ extended: true }));
 // ✅ Routes
 app.use("/api/auth", require("./routes/auth"));
 app.use("/api/quiz", require("./routes/quiz")); // ✅ PLACE THIS BEFORE listen()
+app.use("/api/brain-games", require("./routes/braingames"));
 
 // ✅ MongoDB connect
 mongoose.connect(process.env.MONGODB_URI)
