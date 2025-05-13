@@ -1,62 +1,138 @@
-const express = require("express");
+const express = require('express');
 const router = express.Router();
-const User = require("../models/User");
+const jwt = require('jsonwebtoken');
+const redis = require('ioredis');
+const User = require('../models/User');
+const sendOtpEmail = require('../utils/sendOtpEmail');
+const validate = require('../middlewares/validate');
+const authSchemas = require('../validations/authSchemas');
 
-const otpStore = {}; // email -> { otp, expires }
-const verifiedEmails = new Set();
+const redisClient = new redis(process.env.REDIS_URL);
+const rateLimit = require('express-rate-limit');
 
-// Dummy email sender
-const sendOtpEmail = async (email, otp) => {
-  console.log(`OTP for ${email} is ${otp}`);
-};
+const authLimiter = rateLimit({
+  windowMs: process.env.RATE_LIMIT_WINDOW * 60 * 1000,
+  max: process.env.RATE_LIMIT_MAX,
+  handler: (req, res) => res.status(429).json({
+    success: false,
+    message: 'Too many requests, please try again later'
+  })
+});
 
-// Send OTP
-router.post("/send-otp", async (req, res) => {
+// Send OTP with rate limiting
+router.post('/send-otp', authLimiter, validate(authSchemas.sendOtp), async (req, res) => {
   const { email } = req.body;
-  if (!email) return res.status(400).json({ success: false });
-
   const otp = Math.floor(100000 + Math.random() * 900000).toString();
-  otpStore[email] = { otp, expires: Date.now() + 5 * 60 * 1000 };
-
+  
+  await redisClient.setex(`otp:${email}`, 600, otp);
   await sendOtpEmail(email, otp);
-  res.json({ success: true, message: "OTP sent" });
+  
+  res.json({ 
+    success: true, 
+    message: 'OTP sent successfully' 
+  });
 });
 
 // Verify OTP
-router.post("/verify-otp", (req, res) => {
+router.post('/verify-otp', validate(authSchemas.verifyOtp), async (req, res) => {
   const { email, otp } = req.body;
-  const stored = otpStore[email];
-  if (!stored || stored.otp !== otp || stored.expires < Date.now()) {
-    return res.status(400).json({ success: false, message: "Invalid or expired OTP" });
+  const storedOtp = await redisClient.get(`otp:${email}`);
+  
+  if (!storedOtp || storedOtp !== otp) {
+    return res.status(400).json({ 
+      success: false, 
+      message: 'Invalid or expired OTP' 
+    });
   }
-
-  verifiedEmails.add(email);
-  delete otpStore[email];
-  res.json({ success: true });
+  
+  await redisClient.del(`otp:${email}`);
+  const tempToken = jwt.sign({ email }, process.env.JWT_SECRET, { 
+    expiresIn: '10m' 
+  });
+  
+  res.json({ 
+    success: true, 
+    tempToken 
+  });
 });
 
-// Register
-router.post("/register", async (req, res) => {
-  const { email, username, password } = req.body;
-  if (!verifiedEmails.has(email)) return res.status(403).json({ message: "OTP not verified" });
+// Register User
+router.post('/register', validate(authSchemas.register), async (req, res) => {
+  try {
+    const { username, password, tempToken } = req.body;
+    
+    const decoded = jwt.verify(tempToken, process.env.JWT_SECRET);
+    if (!decoded.email) throw new Error('Invalid token');
+    
+    const existingUser = await User.findOne({ email: decoded.email });
+    if (existingUser) {
+      return res.status(409).json({ 
+        success: false, 
+        message: 'User already exists' 
+      });
+    }
 
-  const existing = await User.findOne({ email });
-  if (existing) return res.status(409).json({ message: "Email already registered" });
+    const user = await User.create({ 
+      email: decoded.email, 
+      username, 
+      password 
+    });
 
-  const user = new User({ email, username, password });
-  await user.save();
-  verifiedEmails.delete(email);
-  res.json({ success: true });
+    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
+      expiresIn: process.env.JWT_EXPIRES_IN
+    });
+
+    res.status(201).json({
+      success: true,
+      token,
+      user: {
+        id: user._id,
+        username: user.username,
+        email: user.email
+      }
+    });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      message: 'Registration failed',
+      error: error.message
+    });
+  }
 });
 
-// Login
-router.post("/login", async (req, res) => {
-  const { email, password } = req.body;
-  const user = await User.findOne({ email });
-  if (!user || user.password !== password) {
-    return res.status(401).json({ message: "Invalid credentials" });
+// Login User
+router.post('/login', validate(authSchemas.login), async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    const user = await User.findOne({ email }).select('+password');
+
+    if (!user || !(await user.comparePassword(password))) {
+      return res.status(401).json({ 
+        success: false, 
+        message: 'Invalid credentials' 
+      });
+    }
+
+    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
+      expiresIn: process.env.JWT_EXPIRES_IN
+    });
+
+    res.json({
+      success: true,
+      token,
+      user: {
+        id: user._id,
+        username: user.username,
+        email: user.email
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Login failed',
+      error: error.message
+    });
   }
-  res.json({ success: true, username: user.username });
 });
 
 module.exports = router;
