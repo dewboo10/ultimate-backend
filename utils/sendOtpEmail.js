@@ -3,35 +3,22 @@ const nodemailer = require('nodemailer');
 const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
-    type: 'OAuth2',
     user: process.env.EMAIL_USER,
-    clientId: process.env.OAUTH_CLIENT_ID,
-    clientSecret: process.env.OAUTH_CLIENT_SECRET,
-    refreshToken: process.env.OAUTH_REFRESH_TOKEN
+    pass: process.env.EMAIL_PASSWORD
   }
 });
 
-const sendOtpEmail = async (email, otp) => {
-  const mailOptions = {
-    from: `"Ultimate Prep" <${process.env.EMAIL_USER}>`,
-    to: email,
-    subject: '🔐 Your Secure OTP for Ultimate Prep',
-    html: `<div style="font-family: sans-serif; padding: 20px;">
-      <h2 style="color: #2563eb;">Security Verification</h2>
-      <p>Your OTP code is: <strong>${otp}</strong></p>
-      <p style="color: #6b7280; font-size: 0.9rem;">
-        This code will expire in 10 minutes. Do not share it with anyone.
-      </p>
-    </div>`
-  };
-
+module.exports = async (email, otp) => {
   try {
-    await transporter.sendMail(mailOptions);
-    return { success: true };
+    await transporter.sendMail({
+      from: `"Ultimate Prep" <${process.env.EMAIL_USER}>`,
+      to: email,
+      subject: 'Your OTP Code',
+      text: `Your OTP is: ${otp} (valid for 10 minutes)`
+    });
+    return true;
   } catch (error) {
-    console.error('Email sending error:', error);
-    return { success: false, error };
+    console.error('Email error:', error);
+    return false;
   }
 };
-
-module.exports = sendOtpEmail;
