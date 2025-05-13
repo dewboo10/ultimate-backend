@@ -1,89 +1,62 @@
-// ✅ Updated backend routes/auth.js with safe OTP memory check
-
 const express = require("express");
 const router = express.Router();
 const User = require("../models/User");
-const sendOtpEmail = require("../utils/sendOtpEmail");
 
-// In-memory stores
-const otpStore = {}; // { email: { otp: '123456', expires: timestamp } }
+const otpStore = {}; // email -> { otp, expires }
 const verifiedEmails = new Set();
 
-// === SEND OTP ===
+// Dummy email sender
+const sendOtpEmail = async (email, otp) => {
+  console.log(`OTP for ${email} is ${otp}`);
+};
+
+// Send OTP
 router.post("/send-otp", async (req, res) => {
   const { email } = req.body;
-  if (!email) return res.status(400).json({ success: false, error: "Email is required." });
+  if (!email) return res.status(400).json({ success: false });
 
   const otp = Math.floor(100000 + Math.random() * 900000).toString();
-  const result = await sendOtpEmail(email, otp);
+  otpStore[email] = { otp, expires: Date.now() + 5 * 60 * 1000 };
 
-  if (result.success) {
-    otpStore[email] = {
-      otp,
-      expires: Date.now() + 10 * 60 * 1000 // 10 minutes
-    };
-    return res.json({ success: true });
-  } else {
-    return res.status(500).json({ success: false, error: result.error });
-  }
+  await sendOtpEmail(email, otp);
+  res.json({ success: true, message: "OTP sent" });
 });
 
-// === VERIFY OTP ===
+// Verify OTP
 router.post("/verify-otp", (req, res) => {
   const { email, otp } = req.body;
-  if (!email || !otp) return res.status(400).json({ success: false, error: "Email and OTP required." });
-
-  const record = otpStore[email];
-  if (!record || record.otp !== otp) {
-    return res.status(400).json({ success: false, error: "Invalid OTP." });
-  }
-
-  if (Date.now() > record.expires) {
-    delete otpStore[email];
-    return res.status(400).json({ success: false, error: "OTP expired." });
+  const stored = otpStore[email];
+  if (!stored || stored.otp !== otp || stored.expires < Date.now()) {
+    return res.status(400).json({ success: false, message: "Invalid or expired OTP" });
   }
 
   verifiedEmails.add(email);
   delete otpStore[email];
-  return res.json({ success: true });
+  res.json({ success: true });
 });
 
-// === REGISTER ===
+// Register
 router.post("/register", async (req, res) => {
-  const { username, password, email } = req.body;
-  if (!username || !password || !email) {
-    return res.status(400).json({ success: false, error: "All fields required." });
-  }
+  const { email, username, password } = req.body;
+  if (!verifiedEmails.has(email)) return res.status(403).json({ message: "OTP not verified" });
 
-  if (!verifiedEmails.has(email)) {
-    return res.status(403).json({ success: false, error: "Please verify OTP before registering." });
-  }
+  const existing = await User.findOne({ email });
+  if (existing) return res.status(409).json({ message: "Email already registered" });
 
-  const existingUser = await User.findOne({ username });
-  if (existingUser) {
-    return res.status(409).json({ success: false, error: "Username already exists." });
-  }
-
-  const user = new User({ username, password, email });
+  const user = new User({ email, username, password });
   await user.save();
   verifiedEmails.delete(email);
-
-  return res.json({ success: true, user: { username: user.username, isPremium: user.isPremium } });
+  res.json({ success: true });
 });
 
-// === LOGIN ===
+// Login
 router.post("/login", async (req, res) => {
-  const { username, password } = req.body;
-  if (!username || !password) {
-    return res.status(400).json({ success: false, error: "Username and password required." });
+  const { email, password } = req.body;
+  const user = await User.findOne({ email });
+  if (!user || user.password !== password) {
+    return res.status(401).json({ message: "Invalid credentials" });
   }
-
-  const user = await User.findOne({ username, password });
-  if (!user) {
-    return res.status(401).json({ success: false, error: "Invalid credentials." });
-  }
-
-  return res.json({ success: true, user: { username: user.username, isPremium: user.isPremium } });
+  res.json({ success: true, username: user.username });
 });
 
 module.exports = router;

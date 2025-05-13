@@ -1,13 +1,11 @@
-// models/QuizAttempt.js
 const mongoose = require("mongoose");
 
-const quizAttemptSchema = new mongoose.Schema({
-  username: { type: String, required: true },
-  exam: { type: String, required: true },
-  day: { type: String, required: true },
-  completed: { type: Boolean, default: true },
-  selectedAnswers: { type: Object, default: {} },
+const QuizAttemptSchema = new mongoose.Schema({
+  username: String,
+  exam: String,
+  day: Number,
+  selectedAnswers: Object,
   submittedAt: { type: Date, default: Date.now }
 });
 
-module.exports = mongoose.model("QuizAttempt", quizAttemptSchema);
+module.exports = mongoose.model("QuizAttempt", QuizAttemptSchema);

@@ -1,10 +1,10 @@
 const mongoose = require("mongoose");
 
-const brainGameScoreSchema = new mongoose.Schema({
-  username: { type: String, required: true },
-  gameId: { type: String, required: true },
-  score: { type: Number, required: true },
+const BrainGameScoreSchema = new mongoose.Schema({
+  username: String,
+  gameId: String,
+  score: Number,
   updatedAt: { type: Date, default: Date.now }
 });
 
-module.exports = mongoose.model("BrainGameScore", brainGameScoreSchema);
+module.exports = mongoose.model("BrainGameScore", BrainGameScoreSchema);
