@@ -3,7 +3,7 @@ const router = express.Router();
 const jwt = require('jsonwebtoken');
 const redis = require('ioredis');
 const User = require('../models/User');
-const sendOtpEmail = require('../utils/sendOtpEmail');
+const sendOtpEmail = require('../utils/sendOtpemail');
 const validate = require('../middlewares/validate');
 const authSchemas = require('../validations/authSchemas');
 
