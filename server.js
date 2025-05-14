@@ -1,58 +1,33 @@
-
 require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
-const helmet = require('helmet');
-const rateLimit = require('express-rate-limit');
-const authMiddleware = require('./middlewares/auth');
 
 const app = express();
-app.set('trust proxy', 1);
 
-const allowedOrigins = [
-  'https://100dayschallenges.netlify.app',
-  'http://localhost:3000'
-];
-
+// Basic middleware
 app.use(cors({
-  origin: function (origin, callback) {
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      console.error('❌ CORS not allowed from:', origin);
-      callback(new Error("CORS not allowed from this origin: " + origin));
-    }
-  },
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  origin: ['http://localhost:5500', 'http://127.0.0.1:5500'],
   credentials: true
 }));
+app.use(express.json());
 
-app.use(helmet());
-app.use(express.json({ limit: '10kb' }));
-
-const apiLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 100,
-  message: 'Too many requests from this IP, please try again later'
-});
-app.use('/api/', apiLimiter);
-
+// Connect to MongoDB
 mongoose.connect(process.env.MONGODB_URI)
   .then(() => console.log('✅ MongoDB connected'))
   .catch(err => console.error('❌ MongoDB connection error:', err));
 
+// Routes
 app.use('/api/auth', require('./routes/auth'));
-app.use('/api/quiz', authMiddleware, require('./routes/quiz'));
-app.use('/api/brain-games', authMiddleware, require('./routes/braingames'));
+app.use('/api/quiz', require('./routes/quiz'));
+app.use('/api/brain-games', require('./routes/braingames'));
 
+// Error handler
 app.use((err, req, res, next) => {
-  console.error('❌ Uncaught Error:', err.stack);
+  console.error('Error:', err);
   res.status(500).json({
     success: false,
-    message: 'Internal Server Error',
-    error: process.env.NODE_ENV === 'development' ? err.message : undefined
+    message: 'Internal Server Error'
   });
 });
 
