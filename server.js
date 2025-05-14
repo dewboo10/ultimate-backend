@@ -8,12 +8,23 @@ const authMiddleware = require('./middlewares/auth');
 
 const app = express();
 
-// Security Middlewares
-app.use(helmet());
+// ✅ Updated CORS Setup
+const allowedOrigins = [process.env.FRONTEND_URL, 'http://localhost:3000'];
 app.use(cors({
-  origin: process.env.FRONTEND_URL,
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error("CORS not allowed from this origin: " + origin));
+    }
+  },
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true
 }));
+
+// Security Middlewares
+app.use(helmet());
 app.use(express.json({ limit: '10kb' }));
 
 // Rate Limiting
@@ -48,5 +59,6 @@ app.use((err, req, res, next) => {
   });
 });
 
+// Start Server
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
