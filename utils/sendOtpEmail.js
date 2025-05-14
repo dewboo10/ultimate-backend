@@ -9,13 +9,13 @@ const transporter = nodemailer.createTransport({
   }
 });
 
-module.exports = async (email) => {
+module.exports = async (email, otp) => {
   try {
     await transporter.sendMail({
-      from: `"Ultimate Prep" <${process.env.EMAIL_USER}>`,
+      from: `"Exam Prep" <${process.env.EMAIL_USER}>`,
       to: email,
-      subject: 'Welcome!',
-      text: `Thanks for signing up! Your account is now active.`
+      subject: 'Your OTP Code',
+      text: `Your OTP is: ${otp} (valid for 10 minutes)`
     });
     return true;
   } catch (error) {

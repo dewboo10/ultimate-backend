@@ -1,141 +1,86 @@
+
 const express = require('express');
 const router = express.Router();
 const User = require('../models/User');
-const { sendOTP } = require('../utils/emailService');
-
-// Store OTPs in memory (will be cleared on server restart)
-const otpStore = new Map();
-
-// Generate 6-digit OTP
-function generateOTP() {
-  return Math.floor(100000 + Math.random() * 900000).toString();
-}
+const OtpStore = require('../models/OtpStore');
+const sendOtpEmail = require('../utils/sendOtpEmail');
 
 // Send OTP
 router.post('/send-otp', async (req, res) => {
+  const { email } = req.body;
+  if (!email || !email.includes('@')) {
+    return res.status(400).json({ success: false, message: 'Invalid email' });
+  }
+
+  const otp = Math.floor(100000 + Math.random() * 900000).toString();
   try {
-    const { email } = req.body;
-
-    if (!email) {
-      return res.status(400).json({
-        success: false,
-        message: 'Email is required'
-      });
-    }
-
-    // Check if user exists
-    const existingUser = await User.findOne({ email });
-    if (existingUser) {
-      return res.status(400).json({
-        success: false,
-        message: 'Email already registered'
-      });
-    }
-
-    // Generate and store OTP
-    const otp = generateOTP();
-    otpStore.set(email, {
-      code: otp,
-      expiresAt: Date.now() + 10 * 60 * 1000 // 10 minutes expiry
-    });
-
-    // Send OTP via email
-    const sent = await sendOTP(email, otp);
-    if (!sent) {
-      throw new Error('Failed to send OTP');
-    }
-
-    res.json({
-      success: true,
-      message: 'OTP sent successfully'
-    });
-  } catch (error) {
-    console.error('Send OTP Error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to send OTP'
-    });
+    await OtpStore.deleteMany({ email });
+    await OtpStore.create({ email, otp });
+    await sendOtpEmail(email, otp);
+    res.json({ success: true, message: 'OTP sent' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'Failed to send OTP' });
   }
 });
 
-// Register new user
+// Verify OTP
+router.post('/verify-otp', async (req, res) => {
+  const { email, otp } = req.body;
+  const match = await OtpStore.findOne({ email, otp });
+  if (!match) {
+    return res.status(400).json({ success: false, message: 'Invalid or expired OTP' });
+  }
+  await OtpStore.deleteMany({ email });
+  res.json({ success: true, message: 'OTP verified' });
+});
+
+// Register user
 router.post('/register', async (req, res) => {
+  const { username, email, password } = req.body;
+  if (!username || !email || !password) {
+    return res.status(400).json({ success: false, message: 'All fields required' });
+  }
+
   try {
-    const { email, username, password, otp } = req.body;
-
-    // Validate input
-    if (!email || !username || !password || !otp) {
-      return res.status(400).json({
-        success: false,
-        message: 'All fields are required'
-      });
+    const exists = await User.findOne({ email });
+    if (exists) {
+      return res.status(409).json({ success: false, message: 'User already exists' });
     }
 
-    // Verify OTP
-    const storedOTP = otpStore.get(email);
-    if (!storedOTP || storedOTP.code !== otp || Date.now() > storedOTP.expiresAt) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid or expired OTP'
-      });
-    }
-
-    // Create user
-    const user = await User.create({
-      email,
-      username,
-      password
-    });
-
-    // Clear OTP
-    otpStore.delete(email);
+    const user = new User({ username, email, password });
+    await user.save();
 
     res.status(201).json({
       success: true,
       user: {
         id: user._id,
-        email: user.email,
-        username: user.username
+        username: user.username,
+        email: user.email
       }
     });
-  } catch (error) {
-    console.error('Registration Error:', error);
-    res.status(400).json({
-      success: false,
-      message: error.message
-    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'Registration failed' });
   }
 });
 
-// Login
+// Login user
 router.post('/login', async (req, res) => {
-  try {
-    const { email, password } = req.body;
-
-    // Find user and include password for comparison
-    const user = await User.findOne({ email }).select('+password');
-    if (!user || !(await user.comparePassword(password))) {
-      return res.status(401).json({
-        success: false,
-        message: 'Invalid email or password'
-      });
-    }
-
-    res.json({
-      success: true,
-      user: {
-        id: user._id,
-        email: user.email,
-        username: user.username
-      }
-    });
-  } catch (error) {
-    console.error('Login Error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Login failed'
-    });
+  const { email, password } = req.body;
+  const user = await User.findOne({ email }).select('+password');
+  if (!user || !(await user.comparePassword(password))) {
+    return res.status(401).json({ success: false, message: 'Invalid credentials' });
   }
+
+  res.json({
+    success: true,
+    user: {
+      id: user._id,
+      username: user.username,
+      email: user.email
+    }
+  });
 });
 
 module.exports = router;
