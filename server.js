@@ -1,3 +1,4 @@
+
 require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
@@ -5,10 +6,9 @@ const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const authMiddleware = require('./middlewares/auth');
-const Redis = require('ioredis');
 
 const app = express();
-app.set('trust proxy', 1); // Fix for rate limiter on Render
+app.set('trust proxy', 1);
 
 const allowedOrigins = [
   'https://100dayschallenges.netlify.app',
@@ -42,9 +42,6 @@ app.use('/api/', apiLimiter);
 mongoose.connect(process.env.MONGODB_URI)
   .then(() => console.log('✅ MongoDB connected'))
   .catch(err => console.error('❌ MongoDB connection error:', err));
-
-const redisClient = new Redis(process.env.REDIS_URL);
-global.redisClient = redisClient;
 
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/quiz', authMiddleware, require('./routes/quiz'));

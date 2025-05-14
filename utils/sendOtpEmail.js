@@ -1,3 +1,4 @@
+
 const nodemailer = require('nodemailer');
 
 const transporter = nodemailer.createTransport({
@@ -8,14 +9,13 @@ const transporter = nodemailer.createTransport({
   }
 });
 
-module.exports = async (email, otp) => {
+module.exports = async (email) => {
   try {
-    console.log("Sending OTP to:", email, "OTP:", otp);
     await transporter.sendMail({
       from: `"Ultimate Prep" <${process.env.EMAIL_USER}>`,
       to: email,
-      subject: 'Your OTP Code',
-      text: `Your OTP is: ${otp} (valid for 10 minutes)`
+      subject: 'Welcome!',
+      text: `Thanks for signing up! Your account is now active.`
     });
     return true;
   } catch (error) {
