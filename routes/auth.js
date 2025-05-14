@@ -1,13 +1,12 @@
 const express = require('express');
 const router = express.Router();
 const jwt = require('jsonwebtoken');
-const redis = require('ioredis');
 const User = require('../models/User');
 const sendOtpEmail = require('../utils/sendOtpEmail');
 const validate = require('../middlewares/validate');
 const authSchemas = require('../validations/authSchemas');
+const redisClient = global.redisClient; // ✅ Use shared Redis client from server.js
 
-const redisClient = new redis(process.env.REDIS_URL);
 const rateLimit = require('express-rate-limit');
 
 const authLimiter = rateLimit({
@@ -18,6 +17,7 @@ const authLimiter = rateLimit({
     message: 'Too many requests, please try again later'
   })
 });
+
 
 // Send OTP with rate limiting
 router.post('/send-otp', authLimiter, validate(authSchemas.sendOtp), async (req, res) => {

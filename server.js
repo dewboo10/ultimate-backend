@@ -8,8 +8,8 @@ const authMiddleware = require('./middlewares/auth');
 const Redis = require('ioredis');
 
 const app = express();
+app.set('trust proxy', 1); // Fix for rate limiter on Render
 
-// ✅ CORS Configuration (Netlify + local dev)
 const allowedOrigins = [
   'https://100dayschallenges.netlify.app',
   'http://localhost:3000'
@@ -29,11 +29,9 @@ app.use(cors({
   credentials: true
 }));
 
-// ✅ Security Middlewares
 app.use(helmet());
 app.use(express.json({ limit: '10kb' }));
 
-// ✅ Rate Limiting
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 100,
@@ -41,24 +39,17 @@ const apiLimiter = rateLimit({
 });
 app.use('/api/', apiLimiter);
 
-// ✅ MongoDB Connection (Fixed)
-mongoose.connect(process.env.MONGODB_URI, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true
-})
-.then(() => console.log('✅ MongoDB connected'))
-.catch(err => console.error('❌ MongoDB connection error:', err));
+mongoose.connect(process.env.MONGODB_URI)
+  .then(() => console.log('✅ MongoDB connected'))
+  .catch(err => console.error('❌ MongoDB connection error:', err));
 
-// ✅ Redis Connection (Upstash)
 const redisClient = new Redis(process.env.REDIS_URL);
-global.redisClient = redisClient; // make it available globally if needed
+global.redisClient = redisClient;
 
-// ✅ Routes
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/quiz', authMiddleware, require('./routes/quiz'));
 app.use('/api/brain-games', authMiddleware, require('./routes/braingames'));
 
-// ✅ Error Handling
 app.use((err, req, res, next) => {
   console.error('❌ Uncaught Error:', err.stack);
   res.status(500).json({
@@ -68,6 +59,5 @@ app.use((err, req, res, next) => {
   });
 });
 
-// ✅ Start Server
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));

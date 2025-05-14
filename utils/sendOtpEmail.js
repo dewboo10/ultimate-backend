@@ -10,6 +10,7 @@ const transporter = nodemailer.createTransport({
 
 module.exports = async (email, otp) => {
   try {
+    console.log("Sending OTP to:", email, "OTP:", otp);
     await transporter.sendMail({
       from: `"Ultimate Prep" <${process.env.EMAIL_USER}>`,
       to: email,
